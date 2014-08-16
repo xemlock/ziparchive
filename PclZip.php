@@ -14,17 +14,67 @@ require_once dirname(__FILE__) . '/pclzip/pclzip.lib.php';
 class ziparchive_PclZip extends PclZip
 {
     /**
-     * @param  string $name
-     * @return array|int
+     * Parse file list entry and prepare proper file description to be used
+     * when adding file to archive.
+     *
+     * @param  array &$v_entry
+     * @param  array &$p_filedescr
+     * @param  array $v_options
+     * @param  array $v_supported_attributes
+     * @return int
      */
-    function addEmptyFolder($name)
+    function privFileDescrParseAtt(&$v_entry, &$p_filedescr, $v_options, $v_supported_attributes = false)
     {
-        return $this->privAdd(array(
-            array(
-                'filename' => (string) $name,
-                'type' => 'virtual_folder',
-            ),
-        ), $p_result_list, $p_options);
+        // handle virtual folders
+        if (isset($v_entry['type']) && $v_entry['type'] === 'virtual_folder') {
+            $p_filename = $v_entry['filename'];
+            $p_filename = PclZipUtilTranslateWinPath($p_filename);
+            $p_filename = PclZipUtilPathReduction($p_filename);
+
+            if ($p_filename == '') {
+                // TODO handle error
+            }
+
+            $p_filedescr['filename'] = $p_filename;
+            $p_filedescr['type'] = 'virtual_folder';
+
+            return 1;
+        }
+
+        $v_result = parent::privFileDescrParseAtt($v_entry, $p_filedescr, $v_options, $v_supported_attributes);
+        return $v_result;
+    }
+
+    function privFileDescrExpand(&$p_filedescr_list, &$p_options)
+    {
+        $v_result = 1;
+
+        $p_virtfolder_list = array();
+
+        // handle virtual folders
+        for ($i = 0; $i < count($p_filedescr_list); ++$i) {
+            $p_filedescr = &$p_filedescr_list[$i];
+            if (isset($p_filedescr['type']) && $p_filedescr['type'] === 'virtual_folder') {
+                $p_filedescr['filename'] = PclZipUtilTranslateWinPath($p_filedescr['filename'], false);
+                $p_filedescr['filename'] = PclZipUtilPathReduction($p_filedescr['filename']);
+                $p_virtfolder_list[] = $p_filedescr;
+                unset($p_filedescr_list[$i]);
+            }
+        }
+
+        if ($p_virtfolder_list) {
+            $p_filedescr_list = array_values($p_filedescr_list);
+        }
+
+        $v_result = parent::privFileDescrExpand($p_filedescr_list, $p_options);
+
+        if ($v_result == 1) {
+            for ($i = 0; $i < count($p_virtfolder_list); ++$i) {
+                $p_filedescr_list[] = $p_virtfolder_list[$i];
+            }
+        }
+
+        return $v_result;
     }
 
     /**

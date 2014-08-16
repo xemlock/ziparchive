@@ -55,7 +55,12 @@ class ziparchive_ZipArchive
 
     public function addEmptyDir($dirname)
     {
-        $result = $this->_pclzip->addEmptyFolder((string) $dirname);
+        $result = $this->_pclzip->add(array(
+            array(
+                'filename' => $dirname,
+                'type' => 'virtual_folder',
+            ),
+        ));
         $this->_refreshProperties();
         return $result !== 0;
     }
