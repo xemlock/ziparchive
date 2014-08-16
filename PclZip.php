@@ -2,80 +2,27 @@
 
 require_once dirname(__FILE__) . '/pclzip/pclzip.lib.php';
 
+/**
+ * This is an enhanced version of PclZip class with the following additions:
+ * - support for adding empty folders
+ * - support for adding files with completely changed local name, not only path
+ * - compression algorithm info is added to file info
+ *
+ * @package ziparchive
+ * @author  xemlock
+ */
 class ziparchive_PclZip extends PclZip
 {
-    protected $_contents;
-
-    /**
-     * This function is basically a rewrite of privList() but only extracting
-     * info about a single entry.
-     *
-     * @param  int $p_option    PCLZIP_OPT_BY_INDEX or PCLZIP_OPT_BY_NAME
-     * @param  int|string $p_option_value index or name depending on option set
-     * @return array|int        0 on failure, an array with the entry properties
-     */
-    public function getInfo($p_option, $p_option_value)
-    {
-        $this->privDisableMagicQuotes();
-
-        if (($this->zip_fd = @fopen($this->zipname, 'rb')) == 0) {
-            $this->privSwapBackMagicQuotes();
-            PclZip::privErrorLog(PCLZIP_ERR_READ_OPEN_FAIL, 'Unable to open archive \'' . $this->zipname . '\' in binary read mode');
-            return 0;
-        }
-
-        $v_central_dir = array();
-        if (($v_result = $this->privReadEndCentralDir($v_central_dir)) != 1) {
-            $this->privSwapBackMagicQuotes();
-            return 0;
-        }
-
-        @rewind($this->zip_fd);
-        if (@fseek($this->zip_fd, $v_central_dir['offset'])) {
-            $this->privSwapBackMagicQuotes();
-            PclZip::privErrorLog(PCLZIP_ERR_INVALID_ARCHIVE_ZIP, 'Invalid archive size');
-            return 0;
-        }
-
-        $p_info = null;
-
-        switch ($p_option) {
-            case PCLZIP_OPT_BY_INDEX:
-                $index = (int) $p_option_value;
-                for ($i = 0; $i < $v_central_dir['entries']; ++$i) {
-                    if (($v_result = $this->privReadCentralFileHeader($v_header)) != 1) {
-                        $this->privSwapBackMagicQuotes();
-                        return $v_result;
-                    }
-                    if ($i === $index) {
-                        $v_header['index'] = $i;
-                        $this->privConvertHeader2FileInfo($v_header, $p_info);
-                        break;
-                    }
-                }
-                break;
-
-            case PCLZIP_OPT_BY_NAME:
-                $name = (string) $p_option_value;
-                break;
-        }
-
-        $this->privCloseFd();
-        $this->privSwapBackMagicQuotes();
-
-        return $p_info;
-    }
-
     /**
      * @param  string $name
      * @return array|int
      */
-    public function addEmptyFolder($name)
+    function addEmptyFolder($name)
     {
         return $this->privAdd(array(
             array(
                 'filename' => (string) $name,
-                'type'     => 'virtual_folder',
+                'type' => 'virtual_folder',
             ),
         ), $p_result_list, $p_options);
     }
@@ -85,7 +32,7 @@ class ziparchive_PclZip extends PclZip
      * @param  array &$p_header
      * @return int
      */
-    protected function privAddVirtualFolder($p_filename, &$p_header = null)
+    function privAddVirtualFolder($p_filename, &$p_header)
     {
         $p_filename = trim($p_filename, '/\\') . '/';
 

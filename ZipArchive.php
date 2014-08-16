@@ -39,11 +39,14 @@ class ziparchive_ZipArchive
 
     protected $_pclzip;
 
+    protected $_contents;
+
     function open($filename, $flags = 0)
     {
         if ($this->_pclzip) {
         }
         $this->_pclzip = new ziparchive_PclZip($filename);
+        $this->_contents = null;
         $this->_refreshProperties();
     }
 
@@ -76,6 +79,11 @@ class ziparchive_ZipArchive
         $result = $this->_pclzip->add($filename, PCLZIP_OPT_ADD_PATH, $p_add_dir, PCLZIP_OPT_REMOVE_PATH, $p_remove_dir);
         var_dump($result);
         // TODO start, length
+        if ($result !== 0) {
+            $this->_contents = null;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -91,7 +99,11 @@ class ziparchive_ZipArchive
                 PCLZIP_ATT_FILE_CONTENT => $contents,
             ),
         ));
-        return $result !== 0;
+        if ($result !== 0) {
+            $this->_contents = null;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -101,8 +113,12 @@ class ziparchive_ZipArchive
     public function deleteIndex($index)
     {
         $result = $this->_pclzip->delete(PCLZIP_OPT_BY_INDEX, (int) $index);
-        $this->_refreshProperties();
-        return $result !== 0;
+        if ($result !== 0) {
+            $this->_refreshProperties();
+            $this->_contents = null;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -112,8 +128,12 @@ class ziparchive_ZipArchive
     public function deleteName($name)
     {
         $result = $this->_pclzip->delete(PCLZIP_OPT_BY_NAME, $name);
-        $this->_refreshProperties();
-        return $result !== 0;
+        if ($result !== 0) {
+            $this->_refreshProperties();
+            $this->_contents = null;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -123,9 +143,9 @@ class ziparchive_ZipArchive
      */
     public function statIndex($index, $flags = 0)
     {
-        $info = $this->_pclzip->getInfo(PCLZIP_OPT_BY_INDEX, (int) $index);
-        if ($info) {
-            return $this->_statFromInfo($info);
+        $contents = $this->_getContents();
+        if (isset($contents[$index])) {
+            return $this->_statFromInfo($contents[$index]);
         }
         return false;
     }
@@ -137,10 +157,6 @@ class ziparchive_ZipArchive
      */
     public function statName($name, $flags = 0)
     {
-        $info = $this->_pclzip->getInfo(PCLZIP_OPT_BY_NAME, (string) $name);
-        if ($info) {
-            return $this->_statFromInfo($info);
-        }
         return false;        
     }
 
@@ -173,6 +189,14 @@ class ziparchive_ZipArchive
             $this->numFiles = 0;
             $this->comment = null;
             $this->status = null;
-        }    
+        }
+    }
+
+    protected function _getContents()
+    {
+        if ($this->_contents === null) {
+            $this->_contents = $this->_pclzip->listContent();
+        }
+        return $this->_contents;
     }
 }
